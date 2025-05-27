@@ -9,3 +9,5 @@ Source code for drawing daily schedules on a Pimoroni Inky Impression screen
 - `coords.py` are tedious layout coords
 - `style.py` contains text styles used in drawing; needs clean-up
 - `resources/` include background image, logos, etc.
+
+A running example can be watched at https://melokeo.icu/timetable
