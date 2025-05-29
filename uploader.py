@@ -26,31 +26,36 @@ class TimelineUploader:
         ).hexdigest()
         return f"{timestamp}:{signature}"
     
-    def upload_png(self):
+    def upload_png(self, **extra_info):
         if not os.path.exists(self.cfg['png_file']):
             print(f"File not found: {self.cfg['png_file']}")
             return False
         # print(f'Trying to upload {self.cfg['png_file']}')
 
         auth_token = self.gen_auth_token()
+        metadata = {**extra_info}
         
         try:
             with open(self.cfg['png_file'], 'rb') as f:
                 files = {'file': f}
+                metadata = {'metadata': json.dumps(metadata)}
                 headers = {'Authorization': f'Bearer {auth_token}'}
                 
                 response = requests.post(
                     self.cfg['server_url'],
                     files=files,
+                    data=metadata,
                     headers=headers,
                     timeout=30
                 )
                 
             if response.status_code == 200:
+                result = response.json()
                 print("Upload successful")
+                if not result.get('metadata_saved'):
+                    print('!Metadata not updated!')
                 return True
             else:
-                # parse json err msg
                 try:
                     error_data = response.json()
                     error_msg = error_data.get('error', 'Unknown error')

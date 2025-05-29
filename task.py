@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from datetime import time, datetime, timedelta
 from typing import Optional, Set, List
 from display import display, mixColors
+from alarm import Sound
 
 @dataclass(frozen=True)
 class Tag:
@@ -9,6 +10,8 @@ class Tag:
     text_color: tuple = field(default_factory=lambda: display.BLACK)
     border_color: tuple = field(default_factory=lambda: mixColors(r=5,w=18))
     fill_color: tuple = field(default_factory=lambda: display.WHITE)
+    has_alarm: bool = False
+    alarm_sound: Sound = Sound.DEFAULT
 
 @dataclass
 class TaskTemplate:
@@ -20,8 +23,8 @@ class TaskTemplate:
     text_color: Optional[tuple] = None
     border_color: Optional[tuple] = None
     fill_color: Optional[tuple] = None
-    has_alarm: bool = False
-    alarm_sound: str = "default"
+    has_alarm: Optional[bool] = None
+    alarm_sound: Optional[Sound] = None
    
     def __post_init__(self):
         if self.tags:
@@ -33,9 +36,14 @@ class TaskTemplate:
                 self.border_color = tag.border_color
             if self.fill_color is None:
                 self.fill_color = tag.fill_color
+            if self.has_alarm is None:
+                self.has_alarm = tag.has_alarm
+            if self.alarm_sound is None:
+                self.alarm_sound = tag.alarm_sound
+            
 
 @dataclass
-class DayPreset:
+class DayPreset:            # intended for a daily routine with time set, ready for use.
     name: str
     tasks: List[TaskTemplate] = field(default_factory=list)
     
@@ -56,6 +64,9 @@ class DayPreset:
             )
             for template in self.tasks
         ]
+    
+    def __add__(self, other:'DayPreset') -> 'DayPreset':
+        return DayPreset(name=f'{self.name}+{other.name}', tasks=self.tasks+other.tasks)
 
 @dataclass
 class Task:

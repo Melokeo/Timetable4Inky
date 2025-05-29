@@ -10,10 +10,11 @@ import signal
 
 # local modules
 from draw import TotalRenderer, get_timeline_panel_ranges
-from routines import rt_workday 
-from task import find_current_task
+from routines import rt_workday, routines
+from task import find_current_task, Task
 from uploader import TimelineUploader
 from display import display
+from alarm import bark
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 daemon = None
@@ -38,20 +39,21 @@ class ScheduleDaemon:
         self.update_timer = None
         self.update_queue = []  # Priority queue of (datetime, trigger) tuples
         self.stop_event = threading.Event()
+        self.stat_str = ''
         
     def start(self):
         self.running = True
         print("Schedule daemon started")
-        
-        # Initial update
-        self._update_display()
-        self.uploader.upload_png()
         
         # Schedule all updates for today
         self._schedule_today_updates()
         
         # Start the update loop
         self._schedule_next_update()
+        
+        # Initial update
+        self._update_display()
+        self.uploader.upload_png(note=self.stat_str)
         
         # Block until stop is called
         while self.running:
@@ -76,8 +78,8 @@ class ScheduleDaemon:
             if task_end > now:
                 heapq.heappush(self.update_queue, (task_end, UpdateTrigger.TASK_END))
         
-        # Add panel shift times (for now just 18:00)
-        panel_time = now.replace(hour=18, minute=0, second=0, microsecond=0)
+        # Add panel shift times (for now 12:00)
+        panel_time = now.replace(hour=12, minute=0, second=0, microsecond=1)
         if panel_time > now:
             heapq.heappush(self.update_queue, (panel_time, UpdateTrigger.PANEL_SHIFT))
         
@@ -115,8 +117,9 @@ class ScheduleDaemon:
         if next_update:
             # Calculate delay in seconds
             delay = (next_update - now).total_seconds()
-            
-            print(f"Next update scheduled: {next_update.strftime('%H:%M:%S')} ({next_trigger.value})")
+
+            self.stat_str = f"Next update scheduled: {next_update.strftime('%H:%M:%S')} ({next_trigger.value})"
+            print(self.stat_str)
             
             # Cancel existing timer if any
             if self.update_timer:
@@ -130,7 +133,8 @@ class ScheduleDaemon:
             tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=1, second=0, microsecond=0)
             delay = (tomorrow - now).total_seconds()
             
-            print(f"No more updates today. Scheduling for tomorrow at {tomorrow.strftime('%H:%M:%S')}")
+            self.stat_str = f"No more updates today. Scheduling for tomorrow at {tomorrow.strftime('%H:%M:%S')}"
+            print(self.stat_str)
             
             if self.update_timer:
                 self.update_timer.cancel()
@@ -145,16 +149,26 @@ class ScheduleDaemon:
             
         print(f"Update triggered: {trigger.value}")
         
+        # alarm
+        if trigger == UpdateTrigger.TASK_START:
+            now = datetime.now()
+            today_tasks = self.routine.create_schedule(date.today())        #TODO This is not clean.
+            curr_task:Task = find_current_task(today_tasks, now)
+            if curr_task and curr_task.has_alarm:
+                print(f'Playing alarm {curr_task.alarm_sound} for {curr_task.title}')
+                bark(curr_task.alarm_sound)
+
+        # update display
         self._update_display()
         self.last_update = datetime.now()
+
+        # schedule next
+        self._schedule_next_update()
         
         try:
-            self.uploader.upload_png()
+            self.uploader.upload_png(note=self.stat_str)
         except Exception as e:
             print(f"Upload error: {e}")
-        
-        # Schedule next update
-        self._schedule_next_update()
     
     def _start_new_day(self):
         """Reset for a new day"""
@@ -196,6 +210,9 @@ def signal_handler(signum, frame):
     sys.exit(0)
 
 if __name__ == "__main__":
-    daemon = ScheduleDaemon(rt_workday)
+    if (d:=datetime.now().strftime('%m%d')) in routines.keys():
+        daemon = ScheduleDaemon(routines[d])
+    else:
+        daemon = ScheduleDaemon(rt_workday)
     signal.signal(signal.SIGINT, signal_handler)
     daemon.start()

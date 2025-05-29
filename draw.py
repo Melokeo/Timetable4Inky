@@ -9,28 +9,35 @@ Main components for rendering the display.
 [ TotalRenderer << 2*TimelineVRenderer ] ==> display.image
 
 main entry point:
-(TotalRenderer).create_schedule_image(routine)
+TotalRenderer().create_schedule_image(routine)
 '''
 
 import os
 import locale
 from datetime import datetime, date, timedelta
+import platform
 
 from numpy import linspace
 from PIL import Image, ImageDraw
 
 import lunar_python
 
-from coords import layout_coords, timeline_left_coords, timeline_right_coords
+from coords import layout_coords, timeline_left_coords, timeline_right_coords, top_vert_line_coords
 from display import INKY_AVAILABLE, display, mixColors
-from task import Task, find_current_task
-from routines import rt_workday
+from task import Task, find_current_task, find_next_task
+from routines import rt_workday, routines
 from uploader import TimelineUploader
 from style import text_styles
 
-locale.setlocale(locale.LC_CTYPE, 'Chinese')
+try:
+    if platform.system() == "Windows":
+        locale.setlocale(locale.LC_CTYPE, 'Chinese')
+    else:
+        locale.setlocale(locale.LC_CTYPE, 'zh_CN.UTF-8')
+except locale.Error as e:
+    print(f'Locale setting failed. Code may crash later: {e}')
 
-VER_IDENTIFIER = 'A'
+VER_IDENTIFIER = 'C'
 
 #TODO move these later
 radius = 4 # task rect round corner
@@ -104,6 +111,9 @@ class BaseRenderer:
 
     def _insert_img(self, draw, pos, img_path, size=None, anchor="lt"):
         """Insert image with anchor positioning"""
+        if not os.path.isabs(img_path):
+            img_path = os.path.join(BASE_DIR, 'resources', img_path)
+        
         x, y = pos
         try:
             img = Image.open(img_path)
@@ -133,6 +143,7 @@ class BaseRenderer:
 class TotalRenderer(BaseRenderer):
     def __init__(self):
         super().__init__()
+        self.curr_routine_ident = None
         
     def create_schedule_image(self, routine, date_str=None):
         self.img = Image.new("RGB" if not INKY_AVAILABLE else "P", 
@@ -156,6 +167,7 @@ class TotalRenderer(BaseRenderer):
 
         # init task list
         self.task_instances = routine.create_schedule(date.today())
+        self.curr_routine_ident = routine.name
         
         # ═══════════════════════════════════════════════════════════
         # HEADER ZONE - Draw your header layout here
@@ -192,7 +204,38 @@ class TotalRenderer(BaseRenderer):
         #draw.text((LAYOUT['margin'], LAYOUT['margin']), date_str,
                #   fill=display.BLACK, font=self.fonts['title'])
         
-        self._insert_img(self.img, pos=(8, 29), img_path=os.path.join(BASE_DIR, 'resources', "icons8-wifi-48.png"), anchor='lb', size=(24,24))
+        # -------- left top --------
+        self._insert_img(self.img, layout_coords['wifi'], img_path="icons8-wifi-48.png", anchor='lb', size=(24,24))
+
+        # dividers
+        '''self._draw_rounded_line(
+            draw,
+            top_vert_line_coords['1t'],
+            top_vert_line_coords['1b'],
+            width=3,
+            fill=mixColors(k=5, w=8),
+        )
+
+        self._draw_rounded_line(
+            draw,
+            top_vert_line_coords['2t'],
+            top_vert_line_coords['2b'],
+            width=3,
+            fill=mixColors(k=5, w=8),
+        )'''
+        draw.line(
+            (top_vert_line_coords['1t'],
+            top_vert_line_coords['1b']),
+            width=2,
+            fill=mixColors(k=5, w=8),
+        )
+
+        draw.line(
+            (top_vert_line_coords['2t'],
+            top_vert_line_coords['2b']),
+            width=2,
+            fill=mixColors(k=5, w=8),
+        )
 
         self._draw_styled_text(
             draw,
@@ -207,7 +250,46 @@ class TotalRenderer(BaseRenderer):
             layout_coords['updated_time'],
             style_name='updated_time',
         )
+
+        self._insert_img(self.img, layout_coords['refresh_ico'], "refr.png", size=(21,21), anchor='lb')
+
+        self._draw_styled_text(
+            draw,
+            self.curr_routine_ident or 'UNKNOWN RT',
+            layout_coords['routine_ident'],
+            style_name='updated_time',
+        )
+
+        self._draw_styled_text(
+            draw,
+            '*未接受*',
+            layout_coords['task_stat'],
+            style_name='task_stat',
+        )
+
+        next_task:Task = find_next_task(self.task_instances)
+        self._draw_styled_text(
+            draw,
+            '下一项',
+            layout_coords['hint_next'],
+            style_name='hint_next',
+        )
         
+        self._draw_styled_text(
+            draw,
+            '--' if not next_task else next_task.start_time.strftime('%H:%M'),
+            layout_coords['time_next'],
+            style_name='time_next',
+        )
+
+        self._draw_styled_text(
+            draw,
+            '--' if not next_task else next_task.title,
+            layout_coords['next_task'],
+            style_name='next_task',
+        )
+
+        # -------- right top --------
         self._draw_rounded_line(
             draw, 
             layout_coords['lineTitle_left'], 
@@ -215,8 +297,6 @@ class TotalRenderer(BaseRenderer):
             width=3, 
             fill=display.RED,
         )
-        
-        # draw.line([layout_coords['lineTitle_left'], layout_coords['lineTitle_rt']], fill=display.RED, width=3)
 
         self._draw_styled_text(
             draw,
@@ -270,23 +350,17 @@ class TotalRenderer(BaseRenderer):
             style_name='task_now_hint',
         )
 
-        # Get task text
+        # get task
         curr_task = find_current_task(self.task_instances)
         default_task = '困觉' if sleep_hours[0] < datetime.now().hour < sleep_hours[1] else '啥都没有，画画吧？'
         str_task = default_task if not curr_task else curr_task.title
         
-        # Simple bypass: use smaller font if text is too long
-        max_width = 300  # Threshold for switching to smaller font
+        # use smaller font if too long
+        max_width = 300  
         normal_width = self._get_text_size(str_task, 'task_now')[0]
+        font_style = 'task_now_small' if normal_width > max_width else 'task_now'
         
-        if normal_width > max_width:
-            # Too long - use smaller font
-            font_style = 'task_now_small'
-        else:
-            # Fits fine - use normal font
-            font_style = 'task_now'
-        
-        # Single line background rectangle
+        # background rect
         width_task = self._get_text_size(str_task, font_style)[0]
         coord_anchor_task = layout_coords['task_now']
         height_bgrect = 20
@@ -300,7 +374,7 @@ class TotalRenderer(BaseRenderer):
             fill=mixColors(r=5, w=20),
         ) 
         
-        # Single line text
+        # text
         self._draw_styled_text(
             draw,
             str_task,
@@ -386,7 +460,7 @@ class TotalRenderer(BaseRenderer):
     
     def _draw_footer(self, draw):
         """CUSTOMIZE YOUR FOOTER LAYOUT HERE"""
-        self._insert_img(self.img, layout_coords['logo'], os.path.join(BASE_DIR, 'resources', "logo.png"), size=(32,32), anchor='lb')
+        self._insert_img(self.img, layout_coords['logo'], img_path="logo.png", size=(32,32), anchor='lb')
 
 class TimelineVRenderer(BaseRenderer):
     """
@@ -1007,7 +1081,8 @@ def update_display(routine):
     img = renderer.create_schedule_image(routine)
     
     display.set_image(img)
-    # display.show()
+    if platform.system == 'Windows':
+        display.show()
     
     if not INKY_AVAILABLE:
         out_path = os.path.join(BASE_DIR, 'output')
@@ -1065,9 +1140,12 @@ dict_wk = {
 }
 
 if __name__ == "__main__":
-    update_display(rt_workday)
+    if (d:=datetime.now().strftime('%m%d')) in routines.keys():
+        update_display(routines[d])
+    else:
+        update_display(rt_workday)
     uploader = TimelineUploader(os.path.join(BASE_DIR, 'cfg', 'upload_config.json'))
     try:
-        uploader.upload_png()
+        uploader.upload_png(note='Bolus exec')
     except Exception as e:
         print(e)
