@@ -28,6 +28,7 @@ from task import Task, find_current_task, find_next_task
 from routines import rt_workday, routines
 from uploader import TimelineUploader
 from style import text_styles
+from mImageDraw import MImageDraw
 
 try:
     if platform.system() == "Windows":
@@ -44,111 +45,28 @@ radius = 4 # task rect round corner
 sleep_hours = (0, 6)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-class BaseRenderer:
+'''class BaseRenderer:
     def __init__(self):
-        self.styles = text_styles
-
-    def _draw_styled_text(self, draw, text, position, style_name):
-        """Draw text with predefined style"""
-        try:
-            style = self.styles[style_name]
-        except KeyError:
-            print('_draw_styled_text: Invalid style name was passed!')
-            return
-        draw.text(position, text, 
-                fill=style.color, 
-                font=style.font, 
-                anchor=style.anchor)
+        pass
     
-    def _draw_rounded_line(self, draw, start, end, fill=display.BLACK, width=2):
-        """Draw line with rounded ends"""
-        x1, y1 = start
-        x2, y2 = end
-        
-        # Draw main line
-        draw.line([start, end], fill=fill, width=width)
-        
-        # Draw rounded caps
-        radius = width // 2
-        draw.ellipse([(x1-radius, y1-radius), (x1+radius, y1+radius)], fill=fill)
-        draw.ellipse([(x2-radius, y2-radius), (x2+radius, y2+radius)], fill=fill)
-    
-    def _draw_rounded_rect(self, draw, pos, radius=10, fill=None, outline=None, width=1):
-        """Draw rounded rectangle with optional fill and border. excluding lt border"""
-        x1, y1 = pos[0]
-        x2, y2 = pos[1]
-        
-        # Draw two rectangles that form a cross shape
-        draw.rectangle([(x1+radius, y1), (x2-radius, y2)], fill=fill, outline=None)
-        draw.rectangle([(x1, y1+radius), (x2, y2-radius)], fill=fill, outline=None)
-        
-        # Draw corner circles at the correct positions
-        corners = [
-            (x1, y1),                    # Top-left
-            (x2-2*radius, y1),           # Top-right
-            (x1, y2-2*radius),           # Bottom-left
-            (x2-2*radius, y2-2*radius)   # Bottom-right
-        ]
-        
-        for x, y in corners:
-            draw.ellipse([(x, y), (x+2*radius, y+2*radius)], fill=fill, outline=None)
-        
-        # Draw the outline separately if needed
-        if outline:
-            # Draw rounded border
-            # draw.arc([(x1, y1), (x1+2*radius, y1+2*radius)], 180, 270, fill=outline, width=width)
-            draw.arc([(x2-2*radius, y1), (x2, y1+2*radius)], 270, 0, fill=outline, width=width)
-            draw.arc([(x1, y2-2*radius), (x1+2*radius, y2)], 90, 180, fill=outline, width=width)
-            draw.arc([(x2-2*radius, y2-2*radius), (x2, y2)], 0, 90, fill=outline, width=width)
-            
-            # Draw straight lines
-            draw.line([(x1, y1), (x2-radius, y1)], fill=outline, width=width)
-            draw.line([(x1+radius, y2), (x2-radius, y2)], fill=outline, width=width)
-            draw.line([(x1, y1), (x1, y2-radius)], fill=outline, width=width)
-            draw.line([(x2, y1+radius), (x2, y2-radius)], fill=outline, width=width)
-    
-    # def _draw_triangle
+    def executeStepDraw(draw:MImageDraw, steps:list[tuple]=None) -> None:
+        if not steps: return
+        for step in steps:
+            type = step[0]
+            args = step
+            if type == 'ln':
+                draw.line()'''
 
-    def _insert_img(self, draw, pos, img_path, size=None, anchor="lt"):
-        """Insert image with anchor positioning"""
-        if not os.path.isabs(img_path):
-            img_path = os.path.join(BASE_DIR, 'resources', img_path)
-        
-        x, y = pos
-        try:
-            img = Image.open(img_path)
-            if size:
-                img = img.resize(size)
-            
-            # Adjust position based on anchor
-            w, h = img.size
-            if 'm' in anchor: x -= w // 2  # middle
-            if 'r' in anchor: x -= w       # right
-            if 'm' in anchor: y -= h // 2  # middle  
-            if 'b' in anchor: y -= h       # bottom
-            
-            draw.paste(img, (x, y), img)
-        except FileNotFoundError:
-            print('Lost a wifi icon')
-            pass
-
-    def _get_text_size(self, text, style_name):
-        """Get text width and height"""
-        font = self.styles[style_name].font
-        bbox = font.getbbox(text)
-        width = bbox[2] - bbox[0]
-        height = bbox[3] - bbox[1]
-        return width, height  
-
-class TotalRenderer(BaseRenderer):
+class TotalRenderer:
     def __init__(self):
-        super().__init__()
         self.curr_routine_ident = None
         
     def create_schedule_image(self, routine, date_str=None):
         self.img = Image.new("RGB" if not INKY_AVAILABLE else "P", 
                        (display.width, display.height), display.WHITE)
-        draw = ImageDraw.Draw(self.img)
+        # draw = ImageDraw.Draw(self.img)
+        # draw = DebugDraw(self.img)
+        draw = MImageDraw(self.img)
 
         # Add semi-transparent background
         try:
@@ -205,19 +123,17 @@ class TotalRenderer(BaseRenderer):
                #   fill=display.BLACK, font=self.fonts['title'])
         
         # -------- left top --------
-        self._insert_img(self.img, layout_coords['wifi'], img_path="icons8-wifi-48.png", anchor='lb', size=(24,24))
+        draw.insertImage(layout_coords['wifi'], img_path="icons8-wifi-48.png", anchor='lb', size=(24,24))
 
         # dividers
-        '''self._draw_rounded_line(
-            draw,
+        '''draw.roundedLine(
             top_vert_line_coords['1t'],
             top_vert_line_coords['1b'],
             width=3,
             fill=mixColors(k=5, w=8),
         )
 
-        self._draw_rounded_line(
-            draw,
+        draw.roundedLine(
             top_vert_line_coords['2t'],
             top_vert_line_coords['2b'],
             width=3,
@@ -237,84 +153,73 @@ class TotalRenderer(BaseRenderer):
             fill=mixColors(k=5, w=8),
         )
 
-        self._draw_styled_text(
-            draw,
+        draw.styledText(
             VER_IDENTIFIER,
             layout_coords['ver_ident'],
             style_name='ver_ident',
         )
         
-        self._draw_styled_text(
-            draw,
+        draw.styledText(
             f'更新于 {current_time}', 
             layout_coords['updated_time'],
             style_name='updated_time',
         )
 
-        self._insert_img(self.img, layout_coords['refresh_ico'], "refr.png", size=(21,21), anchor='lb')
+        draw.insertImage(layout_coords['refresh_ico'], "refr.png", size=(21,21), anchor='lb')
 
-        self._draw_styled_text(
-            draw,
+        draw.styledText(
             self.curr_routine_ident or 'UNKNOWN RT',
             layout_coords['routine_ident'],
             style_name='updated_time',
         )
 
-        self._draw_styled_text(
-            draw,
+        draw.styledText(
             '*未接受*',
             layout_coords['task_stat'],
             style_name='task_stat',
         )
 
         next_task:Task = find_next_task(self.task_instances)
-        self._draw_styled_text(
-            draw,
+        draw.styledText(
             '下一项',
             layout_coords['hint_next'],
             style_name='hint_next',
         )
         
-        self._draw_styled_text(
-            draw,
+        draw.styledText(
             '--' if not next_task else next_task.start_time.strftime('%H:%M'),
             layout_coords['time_next'],
             style_name='time_next',
         )
 
-        self._draw_styled_text(
-            draw,
+        draw.styledText(
             '--' if not next_task else next_task.title,
             layout_coords['next_task'],
             style_name='next_task',
         )
 
         # -------- right top --------
-        self._draw_rounded_line(
-            draw, 
+        draw.roundedLine(
             layout_coords['lineTitle_left'], 
             layout_coords['lineTitle_rt'], 
             width=3, 
             fill=display.RED,
         )
 
-        self._draw_styled_text(
-            draw,
+        draw.styledText(
             date_str,
             layout_coords['date'],
             style_name='date',
         )
 
-        self._draw_styled_text(
-            draw,
+        draw.styledText(
             date_str_lunar,
             layout_coords['ganzhi'],
             style_name='ganzhi',
         )
     
     '''def _draw_task_now(self, draw):
-        self._draw_styled_text(
-            draw,
+        draw.styledText(
             '现在应该...',
             layout_coords['task_now_hint'],
             style_name='task_now_hint',
@@ -323,7 +228,7 @@ class TotalRenderer(BaseRenderer):
         # background emphasis line of task now
         curr_task = find_current_task(self.task_instances)
         str_task = '啥都没有，画画吧？' if not curr_task else curr_task.title
-        width_task, _ = self._get_text_size(str_task, 'task_now')
+        width_task, _ = draw.getTextSize(str_task, 'task_now')
         coord_anchor_task = layout_coords['task_now']
         height_bgrect = 20
         yoffset_bgrect = -3
@@ -335,16 +240,14 @@ class TotalRenderer(BaseRenderer):
             fill = mixColors(r=5,w=20),
             ) 
         
-        self._draw_styled_text(
-            draw,
+        draw.styledText(
             str_task,
             coord_anchor_task,
             style_name='task_now',
         )'''
         
     def _draw_task_now(self, draw):
-        self._draw_styled_text(
-            draw,
+        draw.styledText(
             '现在应该...',
             layout_coords['task_now_hint'],
             style_name='task_now_hint',
@@ -357,11 +260,11 @@ class TotalRenderer(BaseRenderer):
         
         # use smaller font if too long
         max_width = 300  
-        normal_width = self._get_text_size(str_task, 'task_now')[0]
+        normal_width = draw.getTextSize(str_task, 'task_now')[0]
         font_style = 'task_now_small' if normal_width > max_width else 'task_now'
         
         # background rect
-        width_task = self._get_text_size(str_task, font_style)[0]
+        width_task = draw.getTextSize(str_task, font_style)[0]
         coord_anchor_task = layout_coords['task_now']
         height_bgrect = 20
         yoffset_bgrect = -3
@@ -375,8 +278,7 @@ class TotalRenderer(BaseRenderer):
         ) 
         
         # text
-        self._draw_styled_text(
-            draw,
+        draw.styledText(
             str_task,
             coord_anchor_task,
             style_name=font_style,
@@ -451,8 +353,7 @@ class TotalRenderer(BaseRenderer):
         
         for i, line in enumerate(lines):
             line_y = start_y + i * line_height
-            self._draw_styled_text(
-                draw,
+            draw.styledText(
                 line,
                 (x, line_y),
                 style_name=style_name,
@@ -460,9 +361,9 @@ class TotalRenderer(BaseRenderer):
     
     def _draw_footer(self, draw):
         """CUSTOMIZE YOUR FOOTER LAYOUT HERE"""
-        self._insert_img(self.img, layout_coords['logo'], img_path="logo.png", size=(32,32), anchor='lb')
+        draw.insertImage(layout_coords['logo'], img_path="logo.png", size=(32,32), anchor='lb')
 
-class TimelineVRenderer(BaseRenderer):
+class TimelineVRenderer:
     """
     Renders timeline grid, axes, and tasks for specified time range.
     
@@ -473,7 +374,6 @@ class TimelineVRenderer(BaseRenderer):
     Call draw_timeline(draw, task_instances) to render.
     """
     def __init__(self, coords_dict:dict, hour_range:tuple):     # the draw object should be passed when calling functions
-        super().__init__()
         self.coords = coords_dict
         self.hour_start, self.hour_end = hour_range
     
@@ -481,7 +381,7 @@ class TimelineVRenderer(BaseRenderer):
         # draws background + all tasks
         self.draw_task_background(draw)
         self.draw_tasks(draw, task_instances)
-        self.draw_current_time_overlay(draw)
+        self.draw_current_time_indicator(draw)
 
     def draw_task_background(self, draw):
         '''background grids for task panel in one col'''
@@ -515,8 +415,7 @@ class TimelineVRenderer(BaseRenderer):
         )
 
         # time axis (vert. bold line)
-        self._draw_rounded_line(
-            draw,
+        draw.roundedLine(
             self.coords["line_top"], self.coords["line_bottom"],
             fill=tuple(int(0.5*w + 0.5*k) for w, k in zip(display.WHITE, display.BLACK)),
             width=3,
@@ -542,7 +441,7 @@ class TimelineVRenderer(BaseRenderer):
         # Draw timepoint spans
         self._draw_timepoint_spans(draw, task_instances)
         
-    def draw_current_time_overlay(self, draw):
+    def draw_current_time_indicator(self, draw):
         """Draw current time indicator directly on the timeline"""
         from datetime import datetime
         
@@ -752,13 +651,13 @@ class TimelineVRenderer(BaseRenderer):
         if height < 15:  # Very short task - line mode
             self._render_line_mode(draw, task, (x1, y1, x2, y2), text_color)
         elif height < 40:  # Short task - small text
-            self._draw_rounded_rect(draw, rect_coords, radius=radius, 
+            draw.roundedRect(rect_coords, radius=radius, 
                             fill=fill_color, outline=border_color, width=2)
             self._render_compact_mode(draw, task, (x1, y1, x2, y2), text_color)
         else:  # Normal task - full content
-            self._draw_rounded_rect(draw, rect_coords, radius=radius, 
+            draw.roundedRect(rect_coords, radius=radius, 
                             fill=fill_color, outline=border_color, width=2)
-            content = self._calculate_adaptive_content(task, width, height)
+            content = self._calculate_adaptive_content(draw, task, width, height)
             self._render_task_text(draw, content, (x1, y1, x2, y2), text_color)
 
     def _render_line_mode(self, draw, task, rect, color):
@@ -781,7 +680,7 @@ class TimelineVRenderer(BaseRenderer):
         
         # Draw text with background for readability
         text_x = x1 + 8
-        text_bbox = self.styles['task'].font.getbbox(title)
+        text_bbox = draw.styles['task'].font.getbbox(title)
         text_width = text_bbox[2] - text_bbox[0]
         text_height = text_bbox[3] - text_bbox[1]
 
@@ -794,7 +693,7 @@ class TimelineVRenderer(BaseRenderer):
         
         # Draw text
         draw.text((text_x, center_y), title, fill=color,
-                font=self.styles['task'].font, anchor='lm')
+                font=draw.styles['task'].font, anchor='lm')
     
     def _render_compact_mode(self, draw, task, rect, color):
         """Compact display with smaller text"""
@@ -808,7 +707,7 @@ class TimelineVRenderer(BaseRenderer):
             title = title[:max_chars-1] + "…"
         
         # Small font for compact mode
-        small_font = self.styles['task_small'].font  # Use smaller font
+        small_font = draw.styles['task_small'].font  # Use smaller font
         
         draw.text((center_x, y1+1), title, fill=color,
                 font=small_font, anchor='mt')
@@ -892,12 +791,12 @@ class TimelineVRenderer(BaseRenderer):
         
         return ((new_x1, y1), (new_x2, y2))
 
-    def _calculate_adaptive_content(self, task, width, height):
+    def _calculate_adaptive_content(self, draw, task, width, height):
         """Determine what content fits in available space with better logic"""
         content = {'title': task.title, 'description': '', 'time': ''}
         
         # Estimate text dimensions
-        title_font = self.styles['task'].font
+        title_font = draw.styles['task'].font
         line_height = 16
         margin = 8
         
@@ -916,9 +815,9 @@ class TimelineVRenderer(BaseRenderer):
         time_both = f"{start_time}-{end_time}"
         
         # Check what fits
-        time_width_both = self._get_text_size(time_both, 'task')[0]
-        time_width_start = self._get_text_size(start_time, 'task')[0]
-        desc_width = self._get_text_size(task.description[:15], 'task')[0] if task.description else 0
+        time_width_both = draw.getTextSize(time_both, 'task')[0]
+        time_width_start = draw.getTextSize(start_time, 'task')[0]
+        desc_width = draw.getTextSize(task.description[:15], 'task')[0] if task.description else 0
         
         # Priority: Title > Time > Description
         if remaining_height >= line_height:  # Space for at least one more line
@@ -985,7 +884,7 @@ class TimelineVRenderer(BaseRenderer):
             return
         
         # Calculate total content height
-        font = self.styles['task'].font
+        font = draw.styles['task'].font
         bbox = font.getbbox('Ay')
         line_height = bbox[3] - bbox[1] + 4
         total_lines = sum(len(text.split('\n')) for _, text in elements)
@@ -999,7 +898,7 @@ class TimelineVRenderer(BaseRenderer):
         for element_type, text in elements:
             for line in text.split('\n'):
                 draw.text((center_x, current_y), line, fill=color,
-                        font=self.styles['task'].font, anchor='mt')
+                        font=draw.styles['task'].font, anchor='mt')
                 current_y += line_height
 
     def _draw_task_timedots(self, draw, task_instances):
@@ -1046,7 +945,7 @@ class TimelineVRenderer(BaseRenderer):
         Note that it by default discards last coord. i.e. bottom tick is not assigned a number.
         '''
         try:
-            self.styles[style]
+            draw.styles[style]
         except KeyError:
             print('_distrib_hours: Invalid style name was passed!')
             return
@@ -1068,8 +967,7 @@ class TimelineVRenderer(BaseRenderer):
         anchors = [(x, int(y)) for y in ys]
 
         for i in range(len(hrs)): 
-            self._draw_styled_text(
-                draw,
+            draw.styledText(
                 str(hrs[i]),
                 position=anchors[i],
                 style_name=style,
@@ -1091,43 +989,46 @@ def update_display(routine):
         print("Preview saved as schedule_preview.png")
 
 def get_timeline_panel_ranges(current_time=None, panel_hours=6, total_hours=24):
-   """
-   Determine which time panels to display based on current time.
+    """
+    Determine which time panels to display based on current time.
+    
+    Args:
+        current_time: datetime object (defaults to now)
+        panel_hours: hours per panel (default 6)
+        total_hours: total hours in cycle (default 24 for single day)
+    
+    Returns:
+        tuple of (left_panel, right_panel) as (start_hour, end_hour)
+    """
+    from datetime import datetime
+    
+    if current_time is None:
+        current_time = datetime.now()
+    
+    current_hour = current_time.hour
+    panels_per_day = total_hours // panel_hours
+    
+    # Calculate which panel current time falls into
+    current_panel = current_hour // panel_hours
    
-   Args:
-       current_time: datetime object (defaults to now)
-       panel_hours: hours per panel (default 6)
-       total_hours: total hours in cycle (default 24 for single day)
+    '''   # Skip first panel (0-6) unless it's the only option
+    if panels_per_day > 2 and current_panel == 0:
+        # Show panels 1 and 2
+        left_start = panel_hours
+        right_start = panel_hours * 2
+    elif current_panel >= panels_per_day - 1:
+        # At last panel: show previous and current
+        left_start = (panels_per_day - 2) * panel_hours
+        right_start = (panels_per_day - 1) * panel_hours
+    else:
+        # Normal case: show current and next
+        left_start = current_panel * panel_hours
+        right_start = (current_panel + 1) * panel_hours'''
+    left_start = current_panel * panel_hours
+    right_start = (current_panel + 1) * panel_hours
    
-   Returns:
-       tuple of (left_panel, right_panel) as (start_hour, end_hour)
-   """
-   from datetime import datetime
-   
-   if current_time is None:
-       current_time = datetime.now()
-   
-   current_hour = current_time.hour
-   panels_per_day = total_hours // panel_hours
-   
-   # Calculate which panel current time falls into
-   current_panel = current_hour // panel_hours
-   
-   # Skip first panel (0-6) unless it's the only option
-   if panels_per_day > 2 and current_panel == 0:
-       # Show panels 1 and 2
-       left_start = panel_hours
-       right_start = panel_hours * 2
-   elif current_panel >= panels_per_day - 1:
-       # At last panel: show previous and current
-       left_start = (panels_per_day - 2) * panel_hours
-       right_start = (panels_per_day - 1) * panel_hours
-   else:
-       # Normal case: show current and next
-       left_start = current_panel * panel_hours
-       right_start = (current_panel + 1) * panel_hours
-   
-   return (left_start, left_start + panel_hours), (right_start, right_start + panel_hours)
+    return (left_start, left_start + panel_hours), (right_start%24, (right_start + panel_hours-1)%24+1)
+    #return (18,24), (0,6)
 
 dict_wk = {
    'Monday': '周一',
