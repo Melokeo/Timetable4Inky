@@ -1,9 +1,11 @@
 import os
 from PIL import ImageFont
 
-from display import display
+from display import display, mixColors
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+#TODO tidy up hard coded sizes
 
 def load_fonts():
     fonts = {}
@@ -53,6 +55,10 @@ text_styles = {
     'task':             TextStyle(fonts['body'], display.BLACK, "lm"),
     'task_small':       TextStyle(fonts['smaller'], display.BLACK, "lm"),
     'task_stat':        TextStyle(fonts['task_stat'], display.RED, "mm"),
+    'task_stat':        TextStyle(fonts['task_stat'], display.GREEN, "mm"),
+    'task_stat_grey':   TextStyle(fonts['task_stat'], display.BLACK, "mm"),
+    'task_stat_red':    TextStyle(fonts['task_stat'], display.RED, "mm"),
+    'task_stat_green':  TextStyle(fonts['task_stat'], mixColors(g=6, w=2, k=1.5), "mm"),
     'next_task':        TextStyle(fonts['small'], display.BLACK, "mm"),
     'hint_next':        TextStyle(fonts['small'], display.BLACK, "lb"),
     'time_next':        TextStyle(fonts['small'], display.BLACK, "lb"),

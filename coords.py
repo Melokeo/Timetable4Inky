@@ -7,12 +7,13 @@ layout_coords = {
     "wifi": (8, 29),            # lb
     "ver_ident": (25, 31),      # lb
     "refresh_ico": (9, 52),     # lb
-    "routine_ident": (36, 52),  # lb
+    "routine_ident": (36, 49),  # lb
     
-    "task_stat": (218, 28),     # mm
-    "next_task": (405, 29),     # mm
-    "hint_next": (300, 27),     # lb
-    "time_next": (300, 52),     # lb
+    "task_stat": (240, 27),     # mm
+    "next_task": (421, 29),     # mm
+    "hint_stat": (153, 27),     # lb
+    "hint_next": (315, 27),     # lb
+    "time_next": (315, 49),     # lb
 
     "logo": (5, 479),           # lb
 
@@ -27,10 +28,10 @@ layout_coords = {
 }
 
 top_vert_line_coords = {
-    '1t': (150, 10),
-    '1b': (150, 52),
-    '2t': (286, 10),
-    '2b': (286, 52),
+    '1t': (139, 10),
+    '1b': (139, 52),
+    '2t': (301, 10),
+    '2b': (301, 52),
 }
 
 timeline_left_coords = {

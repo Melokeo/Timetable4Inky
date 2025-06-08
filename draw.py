@@ -24,11 +24,14 @@ import lunar_python
 
 from coords import layout_coords, timeline_left_coords, timeline_right_coords, top_vert_line_coords
 from display import INKY_AVAILABLE, display, mixColors
-from task import Task, find_current_task, find_next_task
+from task import Task, TaskStat, find_current_task, find_next_task
 from routines import rt_workday, routines
 from uploader import TimelineUploader
 from style import text_styles
 from mImageDraw import MImageDraw
+
+if INKY_AVAILABLE:
+    from display import true_display
 
 try:
     if platform.system() == "Windows":
@@ -38,7 +41,7 @@ try:
 except locale.Error as e:
     print(f'Locale setting failed. Code may crash later: {e}')
 
-VER_IDENTIFIER = 'C'
+VER_IDENTIFIER = 'D'
 
 #TODO move these later
 radius = 4 # task rect round corner
@@ -61,8 +64,8 @@ class TotalRenderer:
     def __init__(self):
         self.curr_routine_ident = None
         
-    def create_schedule_image(self, routine, date_str=None):
-        self.img = Image.new("RGB" if not INKY_AVAILABLE else "P", 
+    def create_schedule_image(self, routine, task_instances:list[Task]=None, date_str=None):
+        self.img = Image.new("RGB" ,#if not INKY_AVAILABLE else "P", 
                        (display.width, display.height), display.WHITE)
         # draw = ImageDraw.Draw(self.img)
         # draw = DebugDraw(self.img)
@@ -84,7 +87,10 @@ class TotalRenderer:
             pass  
 
         # init task list
-        self.task_instances = routine.create_schedule(date.today())
+        if not task_instances:
+            self.task_instances = routine.create_schedule(date.today())
+        else:
+            self.task_instances = task_instances
         self.curr_routine_ident = routine.name
         
         # ═══════════════════════════════════════════════════════════
@@ -110,11 +116,11 @@ class TotalRenderer:
         
         return self.img
     
-    def _draw_header(self, draw, date_str):
+    def _draw_header(self, draw:MImageDraw, date_str):
         """CUSTOMIZE YOUR HEADER LAYOUT HERE"""
         if not date_str:
             date_str = datetime.now().strftime('%Y年 ') + datetime.now().strftime('%m月').lstrip('0') \
-                + datetime.now().strftime('%d日 ') #  + dict_wk[datetime.now().strftime('%A')]
+                + datetime.now().strftime('%d日 ').lstrip('0')  #  + dict_wk[datetime.now().strftime('%A')]
         lunar = lunar_python.Solar.fromDate(datetime.now())
         lunar = lunar.getLunar()
         date_str_lunar = f"{lunar.getYearInGanZhi()}年 {lunar.getMonthInGanZhi()}月 {lunar.getDayInGanZhi()}日 （{lunar.getDayXunKong()}） {dict_wk[datetime.now().strftime('%A')]}"
@@ -172,11 +178,33 @@ class TotalRenderer:
             layout_coords['routine_ident'],
             style_name='updated_time',
         )
-
+        
         draw.styledText(
-            '*未接受*',
+            '状态',
+            layout_coords['hint_stat'],
+            style_name='hint_next',
+        )
+
+        curr_task: Task = find_current_task(self.task_instances)
+        
+        if not curr_task:
+            stat_text = '*空闲中*'
+            style_name = 'task_stat_green'
+        else:
+            if curr_task.curr_status == TaskStat.NOT_ACC:
+                stat_text = '*未接受*'
+                style_name = 'task_stat_red'
+            elif curr_task.curr_status == TaskStat.IGNORED:
+                stat_text = '已略过！'
+                style_name = 'task_stat_red'
+            else:
+                stat_text = '进行中...'
+                style_name = 'task_stat_green'
+            
+        draw.styledText(
+            stat_text,
             layout_coords['task_stat'],
-            style_name='task_stat',
+            style_name=style_name,
         )
 
         next_task:Task = find_next_task(self.task_instances)
@@ -246,7 +274,7 @@ class TotalRenderer:
             style_name='task_now',
         )'''
         
-    def _draw_task_now(self, draw):
+    def _draw_task_now(self, draw:MImageDraw):
         draw.styledText(
             '现在应该...',
             layout_coords['task_now_hint'],
@@ -978,15 +1006,18 @@ def update_display(routine):
     # tasks = build_day_schedule(schedule_data)
     img = renderer.create_schedule_image(routine)
     
-    display.set_image(img)
     if platform.system == 'Windows':
+        display.set_image(img)
         display.show()
+    elif INKY_AVAILABLE:
+        true_display.set_image(img)
+        true_display.show()
     
-    if not INKY_AVAILABLE:
-        out_path = os.path.join(BASE_DIR, 'output')
-        if not os.path.exists(out_path): os.mkdir(out_path)
-        img.save(os.path.join(out_path, 'schedule_preview.png'))
-        print("Preview saved as schedule_preview.png")
+    #if not INKY_AVAILABLE:
+    out_path = os.path.join(BASE_DIR, 'output')
+    if not os.path.exists(out_path): os.mkdir(out_path)
+    img.save(os.path.join(out_path, 'schedule_preview.png'))
+    print("Preview saved as schedule_preview.png")
 
 def get_timeline_panel_ranges(current_time=None, panel_hours=6, total_hours=24):
     """

@@ -1,8 +1,15 @@
 from dataclasses import dataclass, field
 from datetime import time, datetime, timedelta
 from typing import Optional, Set, List
+from enum import Enum, auto
+
 from display import display, mixColors
 from alarm import Sound
+
+class TaskStat(Enum):
+    NOT_ACC = auto()
+    ONGOING = auto()
+    IGNORED = auto()
 
 @dataclass(frozen=True)
 class Tag:
@@ -74,12 +81,18 @@ class Task:
     start_time: datetime
     duration: timedelta
     description: str = ""
+
     tags: Set[Tag] = field(default_factory=set)
     text_color: Optional[tuple] = None
     border_color: Optional[tuple] = None
     fill_color: Optional[tuple] = None
+
     has_alarm: bool = False
-    alarm_sound: str = "default"
+    alarm_sound: Sound = Sound.DEFAULT
+    has_end_alarm: bool = False
+    end_alarm_sound: Sound = Sound._173
+
+    curr_status: TaskStat = TaskStat.NOT_ACC
     
     @property
     def end_time(self) -> datetime:

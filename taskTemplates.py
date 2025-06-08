@@ -2,27 +2,34 @@ from task import TaskTemplate, Tag
 from datetime import time
 from display import display, mixColors
 from typing import Dict, List, Union
+from alarm import Sound
 
 TAGS = {
    "survive": Tag(
         "survive", 
-        fill_color=mixColors(b=5, r=3, w=18),
-        border_color=mixColors(b=5, r=3, w=15),
+        fill_color=mixColors(b=5, r=3, w=38),
+        border_color=mixColors(b=5, r=3, w=8, k=1.5),
+        has_alarm=True,
+        alarm_sound=Sound._173,
     ),
    "self": Tag(
         "self", 
         fill_color=mixColors(y=5, r=5, w=15),
-        border_color=mixColors(y=5, r=5, w=10),
+        border_color=mixColors(y=2, r=5, w=8, k=1.5),
+        has_alarm=True,
+        alarm_sound=Sound.DEFAULT,
     ), 
    "work": Tag(
         "work", 
-        fill_color=mixColors(r=5, w=20),
-        border_color=mixColors(r=5, w=8),
+        fill_color=mixColors(r=5, w=15),
+        border_color=mixColors(r=5, w=8, k=1.5),
     ),
    "exer": Tag(
         "exer", 
-        fill_color=mixColors(r=10, w=10),
-        border_color=mixColors(r=10, w=6),
+        fill_color=mixColors(r=10, w=15),
+        border_color=mixColors(r=10, w=6, k=1.5),
+        has_alarm=True,
+        alarm_sound=Sound.UPRISING,
     ),
 }
 
@@ -32,8 +39,9 @@ TASK_PRESET = {
         start_time=time(0, 0),
         duration_minutes=15,
         tags={TAGS["survive"]},
-        fill_color=mixColors(b=1, g=0.3, w=3),
-        border_color=mixColors(b=1, w=1)
+        fill_color=mixColors(b=1, g=0.3, w=6),
+        border_color=mixColors(b=1, w=1),
+        alarm_sound=Sound.EWMF,
     ),
     
     "drawing": TaskTemplate(
@@ -75,7 +83,7 @@ TASK_PRESET = {
         title="上课",
         start_time=time(0, 0),
         duration_minutes=120,
-        tags={TAGS["work"]}
+        tags={TAGS["self"]}
     ),
     
     "care": TaskTemplate(
@@ -102,7 +110,7 @@ TASK_PRESET = {
     "sleep": TaskTemplate(
         title="KuenGao",
         start_time=time(0, 0),
-        duration_minutes=240,
+        duration_minutes=680,
         tags={TAGS["survive"]}
     ),
 }
@@ -153,25 +161,32 @@ def parse_routine(schedule_string: str) -> List[tuple]:
     tasks = []
     items = [item.strip() for item in schedule_string.split(',') if item.strip()]
     
-    for item in items:
-        parts = item.split('--')
+    i = 0
+    while i < len(items):
+        parts = items[i].split('--')
         time_str, task_name = parts[0].strip().split(' ', 1)
         hour, minute = map(int, time_str.split(':'))
-        
-        if len(parts) > 1:
-            # Custom end time specified
-            end_time_str = parts[1].strip()
-            end_hour, end_minute = map(int, end_time_str.split(':'))
-            start = time(hour, minute)
-            end = time(end_hour, end_minute)
-            
-            # Calculate duration in minutes
+        start = time(hour, minute)
+
+        if len(parts) > 1:      # defined duration
+            end_hour, end_minute = map(int, parts[1].strip().split(':'))
             duration_minutes = (end_hour * 60 + end_minute) - (hour * 60 + minute)
-            
             tasks.append((task_name, start, duration_minutes))
         else:
-            # Use default duration
-            tasks.append((task_name, time(hour, minute)))
+            # either until next start or use default duration
+            if i + 1 < len(items):
+                next_time_str = items[i + 1].split('--')[0].strip().split(' ', 1)[0]
+                next_hour, next_minute = map(int, next_time_str.split(':'))
+                duration_minutes = (next_hour * 60 + next_minute) - (hour * 60 + minute)
+                if duration_minutes >= TASK_PRESET[task_name].duration_minutes:
+                    tasks.append((task_name, start))
+                else:
+                    tasks.append((task_name, start, duration_minutes))
+
+            else:
+                tasks.append((task_name, start))  
+
+        i += 1
     
     return tasks
 
@@ -212,3 +227,4 @@ def test_parse_routine():
 if __name__ == '__main__':
     routine = RoutineBuilder(TASK_PRESET)
     test_parse_routine()
+    # print(TASK_PRESET['sleep'])
